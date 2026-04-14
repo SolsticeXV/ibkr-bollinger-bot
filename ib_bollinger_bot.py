@@ -86,7 +86,8 @@ class IBBollingerBot:
         self.is_shutting_down = False
 
     def log(self, msg: str):
-        now = datetime.utcnow().isoformat()
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
         print(f"[{now}] {msg}")
 
     def _load_state(self) -> BotState:
@@ -276,12 +277,12 @@ class IBBollingerBot:
         if not self.state.last_order_time:
             return False
         last = pd.Timestamp(self.state.last_order_time)
-        return (pd.Timestamp.utcnow() - last).total_seconds() < self.cfg.cooldown_seconds
+        return (pd.Timestamp.now(tz="UTC") - last).total_seconds() < self.cfg.cooldown_seconds
 
     def _mark_order_pending(self, trade):
         self.state.pending_order = True
         self.state.pending_order_id = trade.order.orderId
-        self.state.last_order_time = pd.Timestamp.utcnow().isoformat()
+        self.state.last_order_time = pd.Timestamp.now(tz="UTC").isoformat()
         self._save_state()
 
     def _clear_pending(self):
@@ -330,7 +331,7 @@ class IBBollingerBot:
 
     def _on_exec_details(self, trade, fill):
         try:
-            ts = pd.Timestamp.utcnow().isoformat()
+            ts = pd.Timestamp.now(tz="UTC").isoformat()
             exec_row = {
                 "timestamp": ts,
                 "symbol": self.cfg.symbol,
@@ -368,7 +369,7 @@ class IBBollingerBot:
                 pos = self.state.current_position
                 if pos != 0 and avg_fill and avg_fill > 0:
                     self.state.entry_price = float(avg_fill)
-                    self.state.entry_time = pd.Timestamp.utcnow().isoformat()
+                    self.state.entry_time = pd.Timestamp.now(tz="UTC").isoformat()
                 elif pos == 0:
                     self.state.entry_price = None
                     self.state.entry_time = None
@@ -489,31 +490,55 @@ class IBBollingerBot:
 
 
 if __name__ == "__main__":
-    cfg = BotConfig(
-        symbol="AAPL",
-        sec_type="STK",
-        exchange="SMART",
-        currency="USD",
-        primary_exchange="NASDAQ",
-        bar_size="1 min",
-        duration="3 D",
-        use_rth=True,
-        sma_window=20,
-        num_std=2.0,
-        base_order_qty=1,  # keep at 0 for first test; change to 1 after connection/bar test works
-        stop_loss_pct=0.01,
-        take_profit_pct=0.015,
-        max_position_abs=1,
-        cooldown_seconds=5,
-        timezone="America/New_York",
-        session_start="09:35",
-        session_end="15:55",
-        allow_short=True,
-        state_dir="bot_state",
-        flatten_on_shutdown=False,
-        debug=True,
-    )
+    import time
 
-    bot = IBBollingerBot(cfg)
-    bot.run()
+    symbols = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD"]
+    bots = []
+
+    for i, symbol in enumerate(symbols):
+        cfg = BotConfig(client_id=101 + i,
+            symbol=symbol,
+            sec_type="STK",
+            exchange="SMART",
+            currency="USD",
+            primary_exchange="NASDAQ",
+            bar_size="1 min",
+            duration="3 D",
+            use_rth=True,
+            sma_window=20,
+            num_std=2.0,
+            base_order_qty=1,
+            stop_loss_pct=0.01,
+            take_profit_pct=0.015,
+            max_position_abs=1,
+            cooldown_seconds=5,
+            timezone="America/New_York",
+            session_start="09:35",
+            session_end="15:55",
+            allow_short=True,
+            state_dir=f"bot_state_{symbol}",
+            flatten_on_shutdown=False,
+            debug=False,
+        )
+
+        bot = IBBollingerBot(cfg)
+        bot.connect()
+        bots.append(bot)
+
+    print("Running multi-symbol trading bot...")
+
+    while True:
+        try:
+            for bot in bots:
+                bot.ensure_connection()
+                bot.heartbeat()
+            bots[0].ib.sleep(1)
+        except KeyboardInterrupt:
+            print("Stopping bots...")
+            for bot in bots:
+                try:
+                    bot.shutdown()
+                except SystemExit:
+                    pass
+            break
 

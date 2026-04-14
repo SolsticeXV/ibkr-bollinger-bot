@@ -107,9 +107,23 @@ python ib_bollinger_bot.py
 
 To verify execution without waiting for signals:
 
-- Manually trigger test trades in the script
+- Manually trigger test trades in the script (copy paste the script below at the end of the code)
 - Or reduce Bollinger threshold (e.g. num_std = 0.5) for faster signals
 
+```bash
+    # Force a BUY test trade
+    bot.place_market_order("BUY", 1, reason="manual_test_buy")
+    bot.ib.sleep(5)
+
+    # Force a SELL test trade to close it
+    bot.place_market_order("SELL", 1, reason="manual_test_sell")
+    bot.ib.sleep(5)
+
+    bot.sync_positions()
+    print("TEST POSITION:", bot.state.current_position)
+
+    bot.shutdown()
+```
 ---
 
 ## Output

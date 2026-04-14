@@ -1,0 +1,13 @@
+{
+  "current_position": 0,
+  "entry_price": null,
+  "entry_time": null,
+  "last_processed_bar_time": "2026-04-14T15:06:00-04:00",
+  "last_order_time": "2026-04-14T19:05:06.337131+00:00",
+  "pending_order": false,
+  "pending_order_id": null,
+  "cumulative_realized_pnl": 0.0,
+  "last_signal": 0,
+  "last_error": null,
+  "partial_fill_qty": 0
+}
